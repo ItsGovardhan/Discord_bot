@@ -53,7 +53,8 @@ class RulesView(View):
     @discord.ui.button(label="I will obey ✅", style=discord.ButtonStyle.green)
     async def obey(self, interaction: discord.Interaction, button: Button):
         guild = bot.get_guild(GUILD_ID)
-        member = guild.get_member(interaction.user.id)
+        member = await 
+        guild.get_member(interaction.user.id)
         role = discord.utils.get(guild.roles, name=ROLE_NAME)
         if role not in member.roles:
             await member.add_roles(role)
@@ -64,7 +65,8 @@ class RulesView(View):
     @discord.ui.button(label="I will not obey ❌", style=discord.ButtonStyle.red)
     async def not_obey(self, interaction: discord.Interaction, button: Button):
         guild = bot.get_guild(GUILD_ID)
-        member = guild.get_member(interaction.user.id)
+        member = await 
+        guild.get_member(interaction.user.id)
         role = discord.utils.get(guild.roles, name=ROLE_NAME)
         if role in member.roles:
             await member.remove_roles(role)
