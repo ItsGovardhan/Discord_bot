@@ -7,8 +7,7 @@ from discord.ui import Button, View
 # -----------------------
 GUILD_ID = 1368538603247894578 # Replace with your server ID
 ROLE_NAME = "Dark King"        # Role to assign
-THUMBNAIL_URL = "https://i.postimg.cc/kgfRpBtq/tenor.gif"  # Big banner GIF
-BOT_TOKEN = "TOKEN"   # Replace with your bot token
+THUMBNAIL_URL = "https://i.postimg.cc/kgfRpBtq/tenor.gif"  # Big banner GIF  # Replace with your bot token
 BOT_PREFIX = "!"                # Command prefix
 # -----------------------
 
