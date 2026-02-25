@@ -1,14 +1,21 @@
+import os
 import discord
 from discord.ext import commands
 from discord.ui import Button, View
 
 BOT_PREFIX = "!"
-THUMBNAIL_URL = "https://i.postimg.cc/kgfRpBtq/tenor.gif"  # Replace with your GIF
+THUMBNAIL_URL = "https://i.postimg.cc/kgfRpBtq/tenor.gif"
 
 intents = discord.Intents.default()
-intents.message_content = True
-
+intents.message_content = True  # Must be enabled in Developer Portal
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
+
+# -----------------------
+# PING TEST (to verify bot is alive)
+# -----------------------
+@bot.command()
+async def ping(ctx):
+    await ctx.send(f"Pong! {round(bot.latency*1000)}ms")
 
 # -----------------------
 # ANNOUNCEMENT COMMAND
@@ -16,14 +23,9 @@ bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def announce(ctx, channel: discord.TextChannel = None):
-    """
-    Sends a formatted phishing/scam warning announcement.
-    Usage: !announce #channel
-    """
     if channel is None:
-        channel = ctx.channel  # Default to current channel
+        channel = ctx.channel
 
-    # Embed setup
     embed = discord.Embed(
         title="⚠️ **Phishing/Scam Alert!** ⚠️",
         description=(
@@ -38,7 +40,6 @@ async def announce(ctx, channel: discord.TextChannel = None):
     embed.set_thumbnail(url=THUMBNAIL_URL)
     embed.set_footer(text="Stay safe and never share your account info!")
 
-    # Optional interactive buttons
     class AnnouncementPanel(View):
         def __init__(self):
             super().__init__(timeout=None)
@@ -55,7 +56,6 @@ async def announce(ctx, channel: discord.TextChannel = None):
                 "Always verify the server before joining and never share your password!", ephemeral=True
             )
 
-    # Send the embed with buttons
     await channel.send(embed=embed, view=AnnouncementPanel())
     await ctx.send(f"✅ Announcement sent to {channel.mention}")
 
