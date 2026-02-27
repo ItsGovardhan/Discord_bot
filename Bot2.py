@@ -1,65 +1,160 @@
-import os
 import discord
-from discord.ext import commands
-from discord.ui import Button, View
+from discord.ext import commands, tasks
+import os
+import asyncio
+from flask import Flask
+from threading import Thread
+import subprocess
+from datetime import timedelta
+import json
 
-BOT_PREFIX = "!"
-THUMBNAIL_URL = "https://i.postimg.cc/kgfRpBtq/tenor.gif"
+TOKEN = os.getenv("TOKEN")
+PREFIX = "*"
 
-intents = discord.Intents.default()
-intents.message_content = True  # Must be enabled in Developer Portal
-bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents)
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
-# -----------------------
-# PING TEST (to verify bot is alive)
-# -----------------------
+# ================= KEEP ALIVE SERVER =================
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive 24/7!"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
+# ================= PERSISTENT WARNING DATABASE =================
+
+if not os.path.exists("warnings.json"):
+    with open("warnings.json", "w") as f:
+        json.dump({}, f)
+
+def load_warnings():
+    with open("warnings.json", "r") as f:
+        return json.load(f)
+
+def save_warnings(data):
+    with open("warnings.json", "w") as f:
+        json.dump(data, f, indent=4)
+
+# ================= AUTO GITHUB RESTART SYSTEM =================
+
+@tasks.loop(minutes=5)
+async def auto_update():
+    subprocess.call("git pull", shell=True)
+    print("Checked GitHub for updates.")
+
+    # Restart bot if update pulled
+    os.system("kill 1")
+
+# ================= WARN SYSTEM (NO RESET EVER) =================
+
 @bot.command()
-async def ping(ctx):
-    await ctx.send(f"Pong! {round(bot.latency*1000)}ms")
+@commands.has_permissions(manage_messages=True)
+async def warn(ctx, member: discord.Member, *, reason="No reason provided"):
 
-# -----------------------
-# ANNOUNCEMENT COMMAND
-# -----------------------
+    data = load_warnings()
+
+    if str(member.id) not in data:
+        data[str(member.id)] = 0
+
+    data[str(member.id)] += 1
+    count = data[str(member.id)]
+    save_warnings(data)
+
+    if count == 1:
+        await ctx.send(f"🟠 {member.mention} has been warned.\nReason: {reason}")
+
+    elif count == 2:
+        await member.timeout(timedelta(hours=1))
+        await ctx.send(f"🟠 {member.mention} received 2nd warning.\n⏳ Timeout: 1 Hour")
+
+    elif count >= 3:
+        await member.timeout(timedelta(days=1))
+        await ctx.send(f"🟠 {member.mention} received 3rd warning.\n⏳ Timeout: 1 Day")
+
+# ================= MUTE =================
+
 @bot.command()
-@commands.has_permissions(administrator=True)
-async def announce(ctx, channel: discord.TextChannel = None):
-    if channel is None:
-        channel = ctx.channel
+@commands.has_permissions(moderate_members=True)
+async def mute(ctx, member: discord.Member, minutes: int, *, reason="No reason"):
+    await member.timeout(timedelta(minutes=minutes), reason=reason)
+    await ctx.send(f"🟠 {member.mention} muted for {minutes} minutes.")
+
+# ================= KICK =================
+
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: discord.Member, *, reason="No reason"):
+    await member.kick(reason=reason)
+    await ctx.send(f"🟠 {member} has been kicked.\nReason: {reason}")
+
+# ================= BAN =================
+
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def ban(ctx, member: discord.Member, *, reason="No reason"):
+    await member.ban(reason=reason)
+    await ctx.send(f"🟠 {member} has been banned.\nReason: {reason}")
+
+# ================= RULES =================
+
+@bot.command()
+async def rules(ctx):
 
     embed = discord.Embed(
-        title="⚠️ **Phishing/Scam Alert!** ⚠️",
-        description=(
-            "Hello Peeps 👋\n\n"
-            "There is a **new Phishing Scam method** going around where people may invite you to fake servers. "
-            "If you join, your account can get **Hacked!**\n\n"
-            "❌ Any kind of **Self Promotion** is **Bannable**.\n"
-            "💡 Make a **Ticket** anytime someone promotes their server — it is most likely a **SCAM**!"
-        ),
-        color=discord.Color.red()
+        title="🟠 BLOX FRUITS & ROBLOX SERVER RULES",
+        color=discord.Color.orange()
     )
-    embed.set_thumbnail(url=THUMBNAIL_URL)
-    embed.set_footer(text="Stay safe and never share your account info!")
 
-    class AnnouncementPanel(View):
-        def __init__(self):
-            super().__init__(timeout=None)
+    embed.description = """
+**🟠 ACCOUNT RULES**
+🟠 No buying Roblox accounts  
+🟠 No selling Blox Fruits accounts  
+🟠 No account exchange or trading  
 
-        @discord.ui.button(label="Report Scam 🔍", style=discord.ButtonStyle.red, emoji="🚨")
-        async def report(self, interaction: discord.Interaction, button: Button):
-            await interaction.response.send_message(
-                "Please open a ticket with the moderators immediately! ⚠️", ephemeral=True
-            )
+**🟠 SCAM RULES**
+🟠 No scamming or fake giveaways  
+🟠 No cross trading Blox Fruits items  
 
-        @discord.ui.button(label="More Info ℹ️", style=discord.ButtonStyle.green, emoji="📘")
-        async def more_info(self, interaction: discord.Interaction, button: Button):
-            await interaction.response.send_message(
-                "Always verify the server before joining and never share your password!", ephemeral=True
-            )
+**🟠 BEHAVIOUR RULES**
+🟠 No abusing members  
+🟠 Respect Discord staff  
+🟠 No exploiting or hack discussion  
+🟠 No spam or self promotion  
+🟠 Use correct channels  
+"""
 
-    await channel.send(embed=embed, view=AnnouncementPanel())
-    await ctx.send(f"✅ Announcement sent to {channel.mention}")
+    embed.set_image(url="https://i.postimg.cc/j26gPz3M/tenor.gif")
+    embed.set_footer(text="Breaking rules = Warning & Punishment")
 
-# -----------------------
-# RUN BOT
-# -----------------------
-bot.run(os.environ["TOKEN"])
+    await ctx.send(embed=embed)
+
+# ================= ERROR HANDLER =================
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("🟠 You don't have permission to use this command.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("🟠 Missing arguments. Check command usage.")
+    else:
+        print(error)
+
+# ================= READY =================
+
+@bot.event
+async def on_ready():
+    print(f"Bot connected as {bot.user}")
+    auto_update.start()
+
+# ================= START =================
+
+keep_alive()
+bot.run(TOKEN)
